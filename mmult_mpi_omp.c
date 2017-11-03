@@ -26,7 +26,9 @@ int main(int argc, char* argv[])
   double starttime, endtime;
   MPI_Status status;
   /* insert other global variables here */ 
-  int i, j, k, rows, offset, dest, source, arows, acols, brows, bcols, numworkers;   
+  int i, j, k, rows, offset, dest, source, 
+	arows, acols, brows, bcols, numworkers,
+	totalrows;   
   FILE *fileA;
   FILE *fileB;
   FILE *fileC;
@@ -92,14 +94,22 @@ double c2[nrows][ncols];
 //      cc2  = malloc(sizeof(double) * nrows * ncols);
       offset = 0;
       numworkers = numprocs-1;
-      rows = nrows/(numworkers);
+      rows = nrows/numworkers;
+      totalrows = nrows; 
       for (dest=1; dest<=numworkers; dest++){
         MPI_Send(&offset, 1, MPI_INT, dest, 1, MPI_COMM_WORLD);
+	if (rows > totalrows) {
+	MPI_Send(&totalrows, 1, MPI_INT, dest, 1, MPI_COMM_WORLD);
+	MPI_Send(&a[offset][0], totalrows*nrows, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
+	} else { 
         MPI_Send(&rows, 1, MPI_INT, dest, 1, MPI_COMM_WORLD);
-//        printf("rows after sending: %d\n", rows);
-        MPI_Send(&a[offset][0], rows*nrows, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
+	MPI_Send(&a[offset][0], rows*nrows, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
+	}
+//        printf("rows after sending: %d\n", rows)
+//        MPI_Send(&a[offset][0], rows*nrows, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
         MPI_Send(&b, brows*bcols, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
         offset = offset + rows;
+	totalrows -= rows;
       } 
 
       for (i=1; i<=numworkers; i++){
@@ -154,6 +164,7 @@ double c2[nrows][ncols];
     
     }else {
       // Slave Code goes here
+
       source = 0;
       MPI_Recv(&offset, 1, MPI_INT, source, 1, MPI_COMM_WORLD, &status);
       MPI_Recv(&rows, 1, MPI_INT, source, 1, MPI_COMM_WORLD, &status);	
