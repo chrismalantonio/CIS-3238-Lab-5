@@ -78,36 +78,19 @@ int main(int argc, char* argv[])
         rewind(fileB);
 
         if (myid == 0) { 
-            // Master Code goes here
-            /*      for (i=0;i<arows;i++){
-                    for (j=0; j<acols; j++){
-                    printf("Matrix[%d][%d]: %lf\n", i, j,  a[i][j]);
-                    }
-
-                    }
-                    */
-
-            //      aa = gen_matrix(nrows, ncols);
-            //      bb = gen_matrix(ncols, nrows);
             starttime = MPI_Wtime();
-            /* Insert your master code here to store the product into cc1 */
-            //      cc2  = malloc(sizeof(double) * nrows * ncols);
             offset = 0;
             numworkers = numprocs-1;
             rows = nrows/numworkers;
             if (rows == 0) rows = 1;
-            totalrows = nrows; 
+            int averow, extra;
+            averow = nrows/numworkers;
+            extra = nrows%numworkers;
             for (dest=1; dest<=min(numworkers, nrows); dest++){
+                rows = (dest <= extra) ? averow+1 : averow;
                 MPI_Send(&offset, 1, MPI_INT, dest, 1, MPI_COMM_WORLD);
-                if (rows > totalrows) {
-                    MPI_Send(&totalrows, 1, MPI_INT, dest, 1, MPI_COMM_WORLD);
-                    MPI_Send(&a[offset][0], totalrows*nrows, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
-                } else { 
-                    MPI_Send(&rows, 1, MPI_INT, dest, 1, MPI_COMM_WORLD);
-                    MPI_Send(&a[offset][0], rows*nrows, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
-                }
-                //        printf("rows after sending: %d\n", rows)
-                //        MPI_Send(&a[offset][0], rows*nrows, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
+                MPI_Send(&rows, 1, MPI_INT, dest, 1, MPI_COMM_WORLD);
+                MPI_Send(&a[offset][0], rows*nrows, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
                 MPI_Send(&b, brows*bcols, MPI_DOUBLE, dest, 1, MPI_COMM_WORLD);
                 offset = offset + rows;
                 totalrows -= rows;
@@ -120,11 +103,9 @@ int main(int argc, char* argv[])
 
                 MPI_Recv(&c[offset][0], rows*nrows, MPI_DOUBLE, source, 2, MPI_COMM_WORLD, &status);
             }
-
             endtime = MPI_Wtime();
             printf("%f\n", (endtime - starttime));
             //      mmult(cc2, aa, arows, acols, bb, brows, bcols); 
-
             for (i=0; i<nrows; i++){
                 for (j=0; j<ncols; j++){
                     c2[i][j] = 0;
@@ -164,34 +145,26 @@ int main(int argc, char* argv[])
             printf("MatrixC has been stored in file: fileC.\n");
 
         }else {
-            // Slave Code goes here
+        // Slave Code goes here
             if (nrows >= myid){
                 source = 0;
                 MPI_Recv(&offset, 1, MPI_INT, source, 1, MPI_COMM_WORLD, &status);
                 MPI_Recv(&rows, 1, MPI_INT, source, 1, MPI_COMM_WORLD, &status);	
-
                 MPI_Recv(&a, rows*nrows, MPI_DOUBLE, source, 1, MPI_COMM_WORLD, &status);
-
                 MPI_Recv(&b, brows*bcols, MPI_DOUBLE, source, 1, MPI_COMM_WORLD, &status);
                 //printf("all info recieved...\n");
-
-
-
                 for (k=0; k<ncols; k++){
                     for (i=0; i<rows; i++){
                         c[i][k] = 0; 
-                        printf("offset: %d from worker %d\n", offset, myid);
-                        // printf("trying to multiply!\n");
                         for(j=0; j<brows; j++){
                             c[i][k] += a[i][j] * b[j][k];
                         }
                     }
                 }
-                //printf("Multiplication complete!\n");
+                printf("Multiplication from worker %d complete!\n", myid);
                 MPI_Send(&offset, 1, MPI_INT, 0, 2, MPI_COMM_WORLD);
                 MPI_Send(&rows, 1, MPI_INT, 0, 2, MPI_COMM_WORLD);
                 MPI_Send(&c, rows*ncols, MPI_DOUBLE, 0, 2, MPI_COMM_WORLD);
-
             }
         }
     } else {
